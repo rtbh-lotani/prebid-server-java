@@ -21,7 +21,7 @@ class PrebidServerContainer extends GenericContainer<PrebidServerContainer> {
     private static final int ADMIN_PORT = SystemProperties.getPropertyOrDefault("admin.port", DEFAULT_ADMIN_PORT)
     private static final int DEBUG_PORT = SystemProperties.getPropertyOrDefault("debug.port", DEFAULT_DEBUG_PORT)
 
-    private static final String PBS_DOCKER_IMAGE_NAME = "prebid/prebid-server:latest"
+    private static final String PBS_DOCKER_IMAGE_NAME = "prebid/prebid-server:1.90.0"
 
     PrebidServerContainer(Map<String, String> customConfig) {
         super(PBS_DOCKER_IMAGE_NAME)
