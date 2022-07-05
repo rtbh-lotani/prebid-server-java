@@ -1,13 +1,16 @@
 package org.prebid.server.auction;
 
+import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Data;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.json.JsonMerger;
@@ -28,10 +31,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 public class FpdResolver {
 
@@ -48,7 +50,10 @@ public class FpdResolver {
     private static final Set<String> APP_DATA_ATTR = Set.of("id", "content", "publisher", "privacypolicy");
     private static final Set<String> SITE_DATA_ATTR = Set.of("id", "content", "publisher", "privacypolicy", "mobile");
 
-    private static final TypeReference<List<Data>> USER_DATA_TYPE_REFERENCE =
+    private static final TypeReference<List<String>> STRING_ARRAY_TYPE_REFERENCE =
+            new TypeReference<>() {
+            };
+    private static final TypeReference<List<Data>> DATA_ARRAY_TYPE_REFERENCE =
             new TypeReference<>() {
             };
 
@@ -66,11 +71,12 @@ public class FpdResolver {
         }
         final User resultUser = originUser == null ? User.builder().build() : originUser;
         final ExtUser resolvedExtUser = resolveUserExt(fpdUser, resultUser);
+
         return resultUser.toBuilder()
-                .keywords(getFirstNotNull(getString(fpdUser, "keywords"), resultUser.getKeywords()))
-                .gender(getFirstNotNull(getString(fpdUser, "gender"), resultUser.getGender()))
-                .yob(getFirstNotNull(getInteger(fpdUser, "yob"), resultUser.getYob()))
-                .data(getFirstNotNull(getFpdUserData(fpdUser), resultUser.getData()))
+                .yob(fdpValueOrDefault(fpdUser, FpdFields.YOB, resultUser.getYob()))
+                .gender(fdpValueOrDefault(fpdUser, FpdFields.GENDER, resultUser.getGender()))
+                .keywords(fdpValueOrDefault(fpdUser, FpdFields.KEYWORDS, resultUser.getKeywords()))
+                .data(fdpValueOrDefault(fpdUser, FpdFields.DATA, resultUser.getData()))
                 .ext(resolvedExtUser)
                 .build();
     }
@@ -91,28 +97,22 @@ public class FpdResolver {
                 : resultData.isEmpty() ? null : ExtUser.builder().data(resultData).build();
     }
 
-    private List<Data> getFpdUserData(ObjectNode fpdUser) {
-        final ArrayNode fpdUserDataNode = getValueFromJsonNode(
-                fpdUser, DATA, node -> (ArrayNode) node, JsonNode::isArray);
-
-        return toList(fpdUserDataNode, USER_DATA_TYPE_REFERENCE);
-    }
-
     public App resolveApp(App originApp, ObjectNode fpdApp) {
         if (fpdApp == null) {
             return originApp;
         }
         final App resultApp = originApp == null ? App.builder().build() : originApp;
         final ExtApp resolvedExtApp = resolveAppExt(fpdApp, resultApp);
+
         return resultApp.toBuilder()
-                .name(getFirstNotNull(getString(fpdApp, "name"), resultApp.getName()))
-                .bundle(getFirstNotNull(getString(fpdApp, "bundle"), resultApp.getBundle()))
-                .storeurl(getFirstNotNull(getString(fpdApp, "storeurl"), resultApp.getStoreurl()))
-                .domain(getFirstNotNull(getString(fpdApp, "domain"), resultApp.getDomain()))
-                .cat(getFirstNotNull(getStrings(fpdApp, "cat"), resultApp.getCat()))
-                .sectioncat(getFirstNotNull(getStrings(fpdApp, "sectioncat"), resultApp.getSectioncat()))
-                .pagecat(getFirstNotNull(getStrings(fpdApp, "pagecat"), resultApp.getPagecat()))
-                .keywords(getFirstNotNull(getString(fpdApp, "keywords"), resultApp.getKeywords()))
+                .name(fdpValueOrDefault(fpdApp, FpdFields.NAME, resultApp.getName()))
+                .bundle(fdpValueOrDefault(fpdApp, FpdFields.BUNDLE, resultApp.getBundle()))
+                .domain(fdpValueOrDefault(fpdApp, FpdFields.DOMAIN, resultApp.getDomain()))
+                .storeurl(fdpValueOrDefault(fpdApp, FpdFields.STOREURL, resultApp.getStoreurl()))
+                .cat(fdpValueOrDefault(fpdApp, FpdFields.CAT, resultApp.getCat()))
+                .sectioncat(fdpValueOrDefault(fpdApp, FpdFields.SECTIONCAT, resultApp.getSectioncat()))
+                .pagecat(fdpValueOrDefault(fpdApp, FpdFields.PAGECAT, resultApp.getPagecat()))
+                .keywords(fdpValueOrDefault(fpdApp, FpdFields.KEYWORDS, resultApp.getKeywords()))
                 .ext(resolvedExtApp)
                 .build();
     }
@@ -139,16 +139,17 @@ public class FpdResolver {
         }
         final Site resultSite = originSite == null ? Site.builder().build() : originSite;
         final ExtSite resolvedExtSite = resolveSiteExt(fpdSite, resultSite);
+
         return resultSite.toBuilder()
-                .name(getFirstNotNull(getString(fpdSite, "name"), resultSite.getName()))
-                .domain(getFirstNotNull(getString(fpdSite, "domain"), resultSite.getDomain()))
-                .cat(getFirstNotNull(getStrings(fpdSite, "cat"), resultSite.getCat()))
-                .sectioncat(getFirstNotNull(getStrings(fpdSite, "sectioncat"), resultSite.getSectioncat()))
-                .pagecat(getFirstNotNull(getStrings(fpdSite, "pagecat"), resultSite.getPagecat()))
-                .page(getFirstNotNull(getString(fpdSite, "page"), resultSite.getPage()))
-                .keywords(getFirstNotNull(getString(fpdSite, "keywords"), resultSite.getKeywords()))
-                .ref(getFirstNotNull(getString(fpdSite, "ref"), resultSite.getRef()))
-                .search(getFirstNotNull(getString(fpdSite, "search"), resultSite.getSearch()))
+                .name(fdpValueOrDefault(fpdSite, FpdFields.NAME, resultSite.getName()))
+                .domain(fdpValueOrDefault(fpdSite, FpdFields.DOMAIN, resultSite.getDomain()))
+                .cat(fdpValueOrDefault(fpdSite, FpdFields.CAT, resultSite.getCat()))
+                .sectioncat(fdpValueOrDefault(fpdSite, FpdFields.SECTIONCAT, resultSite.getSectioncat()))
+                .pagecat(fdpValueOrDefault(fpdSite, FpdFields.PAGECAT, resultSite.getPagecat()))
+                .page(fdpValueOrDefault(fpdSite, FpdFields.PAGE, resultSite.getPage()))
+                .ref(fdpValueOrDefault(fpdSite, FpdFields.REF, resultSite.getRef()))
+                .search(fdpValueOrDefault(fpdSite, FpdFields.SEARCH, resultSite.getSearch()))
+                .keywords(fdpValueOrDefault(fpdSite, FpdFields.KEYWORDS, resultSite.getKeywords()))
                 .ext(resolvedExtSite)
                 .build();
     }
@@ -326,29 +327,27 @@ public class FpdResolver {
         }
     }
 
-    private static List<String> getStrings(JsonNode firstItem, String fieldName) {
-        final JsonNode valueNode = firstItem.get(fieldName);
-        final ArrayNode arrayNode = valueNode != null && valueNode.isArray() ? (ArrayNode) valueNode : null;
-        return arrayNode != null && isTextualArray(arrayNode)
-                ? StreamSupport.stream(arrayNode.spliterator(), false)
-                .map(JsonNode::asText)
-                .collect(Collectors.toList())
+    private <T> T fdpValueOrDefault(ObjectNode firstItem,
+                                    FpdFields.Field<T> field,
+                                    T defaultValue) {
+
+        final T fpdValue = fpdValue(firstItem, field);
+        return fpdValue != null ? fpdValue : defaultValue;
+    }
+
+    private <T> T fpdValue(ObjectNode firstItem, FpdFields.Field<T> field) {
+        final JsonNode valueNode = firstItem.at(field.getJsonPointer());
+        final FpdFields.FieldTypes.FieldType<T> fieldType = field.getFieldType();
+
+        return !valueNode.isMissingNode() && fieldType.isCorrectType(valueNode)
+                ? fieldType.convert(jacksonMapper, valueNode)
                 : null;
     }
 
-    private static boolean isTextualArray(ArrayNode arrayNode) {
-        return StreamSupport.stream(arrayNode.spliterator(), false).allMatch(JsonNode::isTextual);
-    }
+    private static <T> List<T> toList(JacksonMapper jacksonMapper,
+                                      JsonNode node,
+                                      TypeReference<List<T>> listTypeReference) {
 
-    private static String getString(ObjectNode firstItem, String fieldName) {
-        return getValueFromJsonNode(firstItem, fieldName, JsonNode::asText, JsonNode::isTextual);
-    }
-
-    private static Integer getInteger(ObjectNode firstItem, String fieldName) {
-        return getValueFromJsonNode(firstItem, fieldName, JsonNode::asInt, JsonNode::isInt);
-    }
-
-    private <T> List<T> toList(JsonNode node, TypeReference<List<T>> listTypeReference) {
         try {
             return jacksonMapper.mapper().convertValue(node, listTypeReference);
         } catch (IllegalArgumentException e) {
@@ -356,16 +355,81 @@ public class FpdResolver {
         }
     }
 
-    private static <T> T getValueFromJsonNode(ObjectNode firstItem, String fieldName,
-                                              Function<JsonNode, T> nodeConverter,
-                                              Predicate<JsonNode> isCorrectType) {
-        final JsonNode valueNode = firstItem.get(fieldName);
-        return valueNode != null && isCorrectType.test(valueNode)
-                ? nodeConverter.apply(valueNode)
-                : null;
+    private static List<String> toListOfStrings(JacksonMapper jacksonMapper, JsonNode node) {
+        return toList(jacksonMapper, node, STRING_ARRAY_TYPE_REFERENCE);
     }
 
-    private static <T> T getFirstNotNull(T firstValue, T secondValue) {
-        return firstValue != null ? firstValue : secondValue;
+    private static List<Data> toListOfData(JacksonMapper jacksonMapper, JsonNode node) {
+        return toList(jacksonMapper, node, DATA_ARRAY_TYPE_REFERENCE);
+    }
+
+    private static class FpdFields {
+
+        // User
+        private static final Field<Integer> YOB = Field.of("/yob", FieldTypes.INTEGER_TYPE);
+        private static final Field<String> GENDER = Field.of("/gender", FieldTypes.STRING_TYPE);
+        private static final Field<List<Data>> DATA = Field.of("/" + FpdResolver.DATA, FieldTypes.DATA_ARRAY_TYPE);
+
+        // App
+        private static final Field<String> BUNDLE = Field.of("/bundle", FieldTypes.STRING_TYPE);
+        private static final Field<String> STOREURL = Field.of("/storeurl", FieldTypes.STRING_TYPE);
+
+        // Site
+        private static final Field<String> PAGE = Field.of("/page", FieldTypes.STRING_TYPE);
+        private static final Field<String> REF = Field.of("/ref", FieldTypes.STRING_TYPE);
+        private static final Field<String> SEARCH = Field.of("/search", FieldTypes.STRING_TYPE);
+
+        // Shared
+        private static final Field<String> NAME = Field.of("/name", FieldTypes.STRING_TYPE);
+        private static final Field<String> DOMAIN = Field.of("/domain", FieldTypes.STRING_TYPE);
+        private static final Field<List<String>> CAT = Field.of("/cat", FieldTypes.STRING_ARRAY_TYPE);
+        private static final Field<List<String>> SECTIONCAT = Field.of("/sectioncat", FieldTypes.STRING_ARRAY_TYPE);
+        private static final Field<List<String>> PAGECAT = Field.of("/pagecat", FieldTypes.STRING_ARRAY_TYPE);
+        private static final Field<String> KEYWORDS = Field.of("/keywords", FieldTypes.STRING_TYPE);
+
+        @Value
+        private static class Field<T> {
+
+            JsonPointer jsonPointer;
+
+            FieldTypes.FieldType<T> fieldType;
+
+            public static <T> Field<T> of(String path, FieldTypes.FieldType<T> fieldType) {
+                return new Field<>(JsonPointer.valueOf(path), fieldType);
+            }
+        }
+
+        private static class FieldTypes {
+
+            private static final FieldType<Integer> INTEGER_TYPE = FieldType.of(JsonNode::isInt, JsonNode::intValue);
+            private static final FieldType<String> STRING_TYPE = FieldType.of(JsonNode::isTextual, JsonNode::textValue);
+            private static final FieldType<List<String>> STRING_ARRAY_TYPE =
+                    FieldType.of(JsonNode::isArray, FpdResolver::toListOfStrings);
+            private static final FieldType<List<Data>> DATA_ARRAY_TYPE =
+                    FieldType.of(JsonNode::isArray, FpdResolver::toListOfData);
+
+            @Value(staticConstructor = "of")
+            @Getter(AccessLevel.NONE)
+            private static class FieldType<T> {
+
+                Predicate<JsonNode> isCorrectType;
+
+                BiFunction<JacksonMapper, JsonNode, T> nodeConverter;
+
+                public static <T> FieldType<T> of(Predicate<JsonNode> isCorrectType,
+                                                  Function<JsonNode, T> nodeConverter) {
+
+                    return FieldType.of(isCorrectType, (jacksonMapper, jsonNode) -> nodeConverter.apply(jsonNode));
+                }
+
+                public boolean isCorrectType(JsonNode jsonNode) {
+                    return isCorrectType.test(jsonNode);
+                }
+
+                public T convert(JacksonMapper jacksonMapper, JsonNode jsonNode) {
+                    return nodeConverter.apply(jacksonMapper, jsonNode);
+                }
+            }
+        }
     }
 }

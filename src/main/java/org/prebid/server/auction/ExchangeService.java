@@ -834,7 +834,8 @@ public class ExchangeService {
         final List<String> firstPartyDataBidders = firstPartyDataBidders(bidRequest.getExt());
         final boolean useFirstPartyData = firstPartyDataBidders == null || firstPartyDataBidders.contains(bidder);
 
-        final ExtBidderConfigOrtb fpdConfig = ObjectUtils.defaultIfNull(biddersToConfigs.get(bidder),
+        final ExtBidderConfigOrtb fpdConfig = ObjectUtils.defaultIfNull(
+                biddersToConfigs.get(bidder),
                 biddersToConfigs.get(ALL_BIDDERS_CONFIG));
 
         final App app = bidRequest.getApp();
