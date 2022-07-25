@@ -14,3 +14,4 @@ adapters:
       cookie-family-name: rtbhouse
       type: redirect
       support-cors: false
+    endpoint-compression: gzip
