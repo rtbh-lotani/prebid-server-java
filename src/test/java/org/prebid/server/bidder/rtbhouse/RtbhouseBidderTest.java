@@ -8,7 +8,6 @@ import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mock;
 import org.prebid.server.VertxTest;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderCall;
@@ -16,7 +15,7 @@ import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.HttpRequest;
 import org.prebid.server.bidder.model.HttpResponse;
 import org.prebid.server.bidder.model.Result;
-import org.prebid.server.currency.CurrencyConversionService;
+// import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 
 import java.util.List;
 import java.util.function.Function;
@@ -32,56 +31,17 @@ public class RtbhouseBidderTest extends VertxTest {
 
     private RtbhouseBidder rtbhouseBidder;
 
-    @Mock
-    private CurrencyConversionService currencyConversionService;
-
     @Before
     public void setUp() {
-        rtbhouseBidder = new RtbhouseBidder(ENDPOINT_URL, currencyConversionService, jacksonMapper);
+        rtbhouseBidder = new RtbhouseBidder(ENDPOINT_URL, jacksonMapper);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
-        assertThatIllegalArgumentException().isThrownBy(() -> new RtbhouseBidder(
-                "invalid_url", currencyConversionService, jacksonMapper));
+        assertThatIllegalArgumentException().isThrownBy(() -> new RtbhouseBidder("invalid_url", jacksonMapper));
     }
 
-    /* private static BidRequest givenBidRequest(
-        Function<Imp.ImpBuilder, Imp.ImpBuilder> impCustomizer,
-        Function<BidRequest.BidRequestBuilder, BidRequest.BidRequestBuilder> requestCustomizer) {
-        return requestCustomizer.apply(BidRequest.builder()
-            .imp(singletonList(givenImp(impCustomizer))))
-            .build();
-    }
-
-    private static BidRequest givenBidRequest(
-        Function<Imp.ImpBuilder, Imp.ImpBuilder> impCustomizer) {
-        return givenBidRequest(impCustomizer, identity());
-    }
-
-    @Test
-    public void makeHttpRequestsShouldConvertCurrency() {
-        // given
-        given(currencyConversionService.convertCurrency(any(), any(), anyString(), anyString()))
-                .willReturn(BigDecimal.TEN);
-
-        final BidRequest bidRequest = givenBidRequest(imp -> imp
-                .bidfloor(BigDecimal.TEN)
-                .bidfloorcur("EUR"));
-
-        // when
-        final Result<List<HttpRequest<BidRequest>>> result = adyoulikeBidder.makeHttpRequests(bidRequest);
-
-        // then
-        assertThat(result.getErrors()).isEmpty();
-        assertThat(result.getValue())
-                .extracting(HttpRequest::getPayload)
-                .flatExtracting(BidRequest::getImp)
-                .extracting(Imp::getBidfloor, Imp::getBidfloorcur)
-                .containsExactly(tuple(BigDecimal.TEN, "USD"));
-    }
-
-    @Test
+    /* @Test
     public void makeHttpRequestsShouldNotModifyIncomingRequest() {
         // given
         final BidRequest bidRequest = BidRequest.builder()
