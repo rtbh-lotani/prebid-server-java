@@ -9,7 +9,8 @@
       },
       "ext": {
         "rtbhouse": {
-          "publisherId": "publisherId"
+          "publisherId": "publisherId",
+          "region": "region"
         }
       }
     }
@@ -19,5 +20,6 @@
     "ext": {
       "gdpr": 0
     }
-  }
+  },
+  "cur": [ "USD" ]
 }

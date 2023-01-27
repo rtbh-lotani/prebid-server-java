@@ -8,6 +8,7 @@ import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mock;
 import org.prebid.server.VertxTest;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderCall;
@@ -15,7 +16,7 @@ import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.HttpRequest;
 import org.prebid.server.bidder.model.HttpResponse;
 import org.prebid.server.bidder.model.Result;
-// import org.prebid.server.proto.openrtb.ext.ExtPrebid;
+import org.prebid.server.currency.CurrencyConversionService;
 
 import java.util.List;
 import java.util.function.Function;
@@ -31,14 +32,20 @@ public class RtbhouseBidderTest extends VertxTest {
 
     private RtbhouseBidder rtbhouseBidder;
 
+    @Mock
+    private CurrencyConversionService currencyConversionService;
+
     @Before
     public void setUp() {
-        rtbhouseBidder = new RtbhouseBidder(ENDPOINT_URL, jacksonMapper);
+        rtbhouseBidder = new RtbhouseBidder(ENDPOINT_URL, currencyConversionService, jacksonMapper);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
-        assertThatIllegalArgumentException().isThrownBy(() -> new RtbhouseBidder("invalid_url", jacksonMapper));
+        assertThatIllegalArgumentException().isThrownBy(() -> new RtbhouseBidder(
+                "invalid_url",
+                currencyConversionService,
+                jacksonMapper));
     }
 
     /* @Test
