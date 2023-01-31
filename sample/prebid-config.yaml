@@ -1,15 +1,15 @@
 status-response: "ok"
 adapters:
-  appnexus:
+  rtbhouse:
     enabled: true
-  ix:
-    enabled: true
-  openx:
-    enabled: true
-  pubmatic:
-    enabled: true
-  rubicon:
-    enabled: true
+    pbs-enforces-ccpa: false
+    endpoint-compression: gzip
+    endpoint:  https://prebidserver-s2s-ams.creativecdn.com/bidder/prebidserver/bids
+    usersync:
+      cookie-family-name: rtbhouse
+      redirect:
+        url: https://creativecdn.com/cm-notify?pi=prebid-brops&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}
+        support-cors: false
 metrics:
   prefix: prebid
 cache:
@@ -28,12 +28,27 @@ settings:
     categories-dir:
 gdpr:
   default-value: 1
+  host-vendor-id: 16
+  enabled: true
   vendorlist:
     v2:
       cache-dir: /var/tmp/vendor2
+ccpa:
+  enforce: false
 admin-endpoints:
   logging-changelevel:
     enabled: true
     path: /logging/changelevel
     on-application-port: true
     protected: false
+  logging-httpinteraction:
+    enabled: true
+    path: /logging/httpinteraction
+    on-application-port: true
+    protected: false
+  currency-rates:
+    enabled: true
+    path: /currency/rates
+    on-application-port: false
+    protected: false
+  

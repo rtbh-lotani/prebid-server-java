@@ -27,6 +27,7 @@ import org.prebid.server.proto.openrtb.ext.request.rtbhouse.ExtImpRtbhouse;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.util.BidderUtil;
 import org.prebid.server.util.HttpUtil;
+import org.prebid.server.util.ObjectUtil;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -137,9 +138,10 @@ public class RtbhouseBidder implements Bidder<BidRequest> {
                         1.00d);
 
         RTBH_LOGGER.warn("ExtImp.BidFloor=%f".formatted(impExt.getBidFloor()), 1.00d);*/
+
         return imp.toBuilder()
-                .bidfloorcur(bidFloorPrice.getCurrency())
-                .bidfloor(bidFloorPrice.getValue())
+                .bidfloorcur(ObjectUtil.getIfNotNull(bidFloorPrice, Price::getCurrency))
+                .bidfloor(ObjectUtil.getIfNotNull(bidFloorPrice, Price::getValue))
                 .build();
     }
 

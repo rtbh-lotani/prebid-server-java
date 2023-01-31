@@ -2,7 +2,7 @@ accounts:
   - id: 1001
     status: active
     auction:
-      price-granularity: low
+      price-granularity: dense
     privacy:
       ccpa:
         enabled: true
