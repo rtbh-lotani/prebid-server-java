@@ -7,8 +7,11 @@ import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderCall;
@@ -32,6 +35,9 @@ public class RtbhouseBidderTest extends VertxTest {
 
     private RtbhouseBidder rtbhouseBidder;
 
+    @Rule
+    public final MockitoRule mockitoRule = MockitoJUnit.rule();
+
     @Mock
     private CurrencyConversionService currencyConversionService;
 
@@ -47,26 +53,6 @@ public class RtbhouseBidderTest extends VertxTest {
                 currencyConversionService,
                 jacksonMapper));
     }
-
-    /* @Test
-    public void makeHttpRequestsShouldNotModifyIncomingRequest() {
-        // given
-        final BidRequest bidRequest = BidRequest.builder()
-                .imp(singletonList(Imp.builder()
-                        .ext(mapper.valueToTree(ExtPrebid.of(null, mapper.createObjectNode())))
-                        .build()))
-                .id("request_id")
-                .build();
-
-        // when
-        final Result<List<HttpRequest<BidRequest>>> result = rtbhouseBidder.makeHttpRequests(bidRequest);
-
-        // then
-        assertThat(result.getErrors()).isEmpty();
-        assertThat(result.getValue()).hasSize(1)
-                .extracting(httpRequest -> mapper.readValue(httpRequest.getBody(), BidRequest.class))
-                .containsOnly(bidRequest);
-    } */
 
     @Test
     public void makeBidsShouldReturnErrorIfResponseBodyCouldNotBeParsed() {

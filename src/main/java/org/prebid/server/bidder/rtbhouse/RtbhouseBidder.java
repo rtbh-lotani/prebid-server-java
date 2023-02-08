@@ -132,12 +132,10 @@ public class RtbhouseBidder implements Bidder<BidRequest> {
     }
 
     private static Imp modifyImp(Imp imp, Price bidFloorPrice) {
-        /*RTBH_LOGGER.warn("BidFloorPrice: Currency=%s Price=%f".formatted(
-                            bidFloorPrice.getCurrency(),
-                            bidFloorPrice.getValue()),
-                        1.00d);
-
-        RTBH_LOGGER.warn("ExtImp.BidFloor=%f".formatted(impExt.getBidFloor()), 1.00d);*/
+        RTBH_LOGGER.warn("modifyImp: Currency=%s Price=%f".formatted(
+                        bidFloorPrice.getCurrency(),
+                        bidFloorPrice.getValue()),
+                1.00d);
 
         return imp.toBuilder()
                 .bidfloorcur(ObjectUtil.getIfNotNull(bidFloorPrice, Price::getCurrency))
@@ -146,17 +144,21 @@ public class RtbhouseBidder implements Bidder<BidRequest> {
     }
 
     private Price resolveBidFloor(Imp imp, ExtImpRtbhouse impExt, BidRequest bidRequest) {
-        RTBH_LOGGER.warn("BidRequest.Cur=%s".formatted(bidRequest.getCur().get(0)),
-                        1.00d);
+        List<String> brCur = bidRequest.getCur();
         Price initialBidFloorPrice = Price.of(imp.getBidfloorcur(), imp.getBidfloor());
+
+        RTBH_LOGGER.warn("BidRequest.Cur=%s".formatted(
+                        brCur != null && brCur.size() > 0
+                                ? brCur.get(0) : null),
+                1.00d);
         RTBH_LOGGER.warn("initialBidFloorPrice: Currency=%s Price=%f".formatted(
                 initialBidFloorPrice.getCurrency(),
                 initialBidFloorPrice.getValue()),
                 1.00d);
 
         BigDecimal impExtBidFloor = impExt.getBidFloor();
-        String impExtCurrency = impExtBidFloor != null && bidRequest.getCur().size() > 0
-                                ? bidRequest.getCur().get(0) : null;
+        String impExtCurrency = impExtBidFloor != null && brCur != null && brCur.size() > 0
+                ? brCur.get(0) : null;
         Price impExtBidFloorPrice = Price.of(impExtCurrency, impExtBidFloor);
         RTBH_LOGGER.warn("impExtBidFloorPrice: Currency=%s Price=%f".formatted(
                 impExtBidFloorPrice.getCurrency(),
