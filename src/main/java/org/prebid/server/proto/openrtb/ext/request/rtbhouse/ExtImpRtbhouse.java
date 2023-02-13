@@ -9,8 +9,8 @@ import java.math.BigDecimal;
 /**
 * Defines the contract for bidrequest.imp[i].ext.rtbhouse
 */
-@Builder
 @Value
+@Builder(toBuilder = true)
 public class ExtImpRtbhouse {
 
     @JsonProperty("publisherId")
