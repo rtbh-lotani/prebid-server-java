@@ -1,12 +1,4 @@
 status-response: "ok"
-server:
-  ssl: true
-  jks-path: C:/Program Files/Java/jdk-17.0.2/lib/security/pbscert
-  jks-password: changeit
-  http:
-    port: 8080
-datacenter-region: ams
-external-url: https://prebid-server.local
 adapters:
   rtbhouse:
     enabled: true
@@ -43,19 +35,3 @@ gdpr:
       cache-dir: /var/tmp/vendor2
 ccpa:
   enforce: false
-admin-endpoints:
-  logging-changelevel:
-    enabled: true
-    path: /logging/changelevel
-    on-application-port: true
-    protected: false
-  logging-httpinteraction:
-    enabled: true
-    path: /logging/httpinteraction
-    on-application-port: true
-    protected: false
-  currency-rates:
-    enabled: true
-    path: /currency/rates
-    on-application-port: false
-    protected: false

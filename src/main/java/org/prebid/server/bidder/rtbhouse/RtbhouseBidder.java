@@ -6,8 +6,6 @@ import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.http.HttpMethod;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.bidder.Bidder;
@@ -21,7 +19,6 @@ import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.json.DecodeException;
 import org.prebid.server.json.JacksonMapper;
-import org.prebid.server.log.ConditionalLogger;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.rtbhouse.ExtImpRtbhouse;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -41,10 +38,6 @@ public class RtbhouseBidder implements Bidder<BidRequest> {
     private static final TypeReference<ExtPrebid<?, ExtImpRtbhouse>> RTBHOUSE_EXT_TYPE_REFERENCE =
             new TypeReference<>() {
             };
-    private static final Logger logger = LoggerFactory.getLogger(RtbhouseBidder.class);
-    private static final ConditionalLogger RTBH_LOGGER =
-            new ConditionalLogger("RTBHouse", logger);
-
     private static final String BIDDER_CURRENCY = "USD";
 
     private final String endpointUrl;
@@ -70,10 +63,6 @@ public class RtbhouseBidder implements Bidder<BidRequest> {
                 final ExtImpRtbhouse impExt = parseImpExt(imp);
                 final Price bidFloorPrice = resolveBidFloor(imp, impExt, bidRequest);
 
-                RTBH_LOGGER.warn("Resolved bidFloorPrice: Currency=%s Price=%f".formatted(
-                        bidFloorPrice.getCurrency(),
-                        bidFloorPrice.getValue()),
-                        1.00d);
                 modifiedImps.add(modifyImp(imp, bidFloorPrice));
             } catch (PreBidException e) {
                 errors.add(BidderError.badInput(e.getMessage()));
@@ -132,10 +121,6 @@ public class RtbhouseBidder implements Bidder<BidRequest> {
     }
 
     private static Imp modifyImp(Imp imp, Price bidFloorPrice) {
-        RTBH_LOGGER.warn("modifyImp: Currency=%s Price=%f".formatted(
-                        bidFloorPrice.getCurrency(),
-                        bidFloorPrice.getValue()),
-                1.00d);
 
         return imp.toBuilder()
                 .bidfloorcur(ObjectUtil.getIfNotNull(bidFloorPrice, Price::getCurrency))
@@ -147,24 +132,10 @@ public class RtbhouseBidder implements Bidder<BidRequest> {
         List<String> brCur = bidRequest.getCur();
         Price initialBidFloorPrice = Price.of(imp.getBidfloorcur(), imp.getBidfloor());
 
-        RTBH_LOGGER.warn("BidRequest.Cur=%s".formatted(
-                        brCur != null && brCur.size() > 0
-                                ? brCur.get(0) : null),
-                1.00d);
-        RTBH_LOGGER.warn("initialBidFloorPrice: Currency=%s Price=%f".formatted(
-                initialBidFloorPrice.getCurrency(),
-                initialBidFloorPrice.getValue()),
-                1.00d);
-
         BigDecimal impExtBidFloor = impExt.getBidFloor();
         String impExtCurrency = impExtBidFloor != null && brCur != null && brCur.size() > 0
                 ? brCur.get(0) : null;
         Price impExtBidFloorPrice = Price.of(impExtCurrency, impExtBidFloor);
-        RTBH_LOGGER.warn("impExtBidFloorPrice: Currency=%s Price=%f".formatted(
-                impExtBidFloorPrice.getCurrency(),
-                impExtBidFloorPrice.getValue()),
-                1.00d);
-
         Price resolvedPrice = initialBidFloorPrice.getValue() == null ? impExtBidFloorPrice : initialBidFloorPrice;
 
         return BidderUtil.isValidPrice(resolvedPrice)
