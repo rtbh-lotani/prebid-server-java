@@ -1,10 +1,10 @@
 package org.prebid.server.bidder.rtbhouse;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.response.Bid;
-import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import org.junit.Before;
 import org.junit.Rule;
@@ -16,18 +16,25 @@ import org.prebid.server.VertxTest;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderCall;
 import org.prebid.server.bidder.model.BidderError;
+import org.prebid.server.bidder.model.CompositeBidderResponse;
 import org.prebid.server.bidder.model.HttpRequest;
 import org.prebid.server.bidder.model.HttpResponse;
 import org.prebid.server.bidder.model.Result;
+import org.prebid.server.bidder.rtbhouse.proto.RtbhouseBidResponse;
+import org.prebid.server.bidder.rtbhouse.proto.RtbhouseBidResponseExt;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.rtbhouse.ExtImpRtbhouse;
+import org.prebid.server.proto.openrtb.ext.response.BidType;
+import org.prebid.server.proto.openrtb.ext.response.FledgeAuctionConfig;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -68,13 +75,14 @@ public class RtbhouseBidderTest extends VertxTest {
         final BidderCall<BidRequest> httpCall = givenHttpCall(null, "invalid");
 
         // when
-        final Result<List<BidderBid>> result = rtbhouseBidder.makeBids(httpCall, null);
+        final CompositeBidderResponse result = rtbhouseBidder.makeBidderResponse(httpCall,
+                BidRequest.builder().build());
 
         // then
-        assertThat(result.getErrors()).hasSize(1);
-        assertThat(result.getErrors().get(0).getMessage()).startsWith("Failed to decode: Unrecognized token");
-        assertThat(result.getErrors().get(0).getType()).isEqualTo(BidderError.Type.bad_server_response);
-        assertThat(result.getValue()).isEmpty();
+        assertThat(result.getErrors()).hasSize(1)
+                .allMatch(error -> error.getType() == BidderError.Type.bad_server_response
+                           && error.getMessage().startsWith("Failed to decode: Unrecognized token 'invalid'"));
+        assertThat(result.getBids()).isEmpty();
     }
 
     @Test
@@ -84,25 +92,25 @@ public class RtbhouseBidderTest extends VertxTest {
                 mapper.writeValueAsString(null));
 
         // when
-        final Result<List<BidderBid>> result = rtbhouseBidder.makeBids(httpCall, null);
+        final CompositeBidderResponse result = rtbhouseBidder.makeBidderResponse(httpCall, null);
 
         // then
         assertThat(result.getErrors()).isEmpty();
-        assertThat(result.getValue()).isEmpty();
+        assertThat(result.getBids()).isEmpty();
     }
 
     @Test
     public void makeBidsShouldReturnEmptyListIfBidResponseSeatBidIsNull() throws JsonProcessingException {
         // given
         final BidderCall<BidRequest> httpCall = givenHttpCall(null,
-                mapper.writeValueAsString(BidResponse.builder().build()));
+                mapper.writeValueAsString(RtbhouseBidResponse.builder().build()));
 
         // when
-        final Result<List<BidderBid>> result = rtbhouseBidder.makeBids(httpCall, null);
+        final CompositeBidderResponse result = rtbhouseBidder.makeBidderResponse(httpCall, null);
 
         // then
         assertThat(result.getErrors()).isEmpty();
-        assertThat(result.getValue()).isEmpty();
+        assertThat(result.getBids()).isEmpty();
     }
 
     @Test
@@ -116,11 +124,11 @@ public class RtbhouseBidderTest extends VertxTest {
                         givenBidResponse(bidBuilder -> bidBuilder.impid("123"))));
 
         // when
-        final Result<List<BidderBid>> result = rtbhouseBidder.makeBids(httpCall, null);
+        final CompositeBidderResponse result = rtbhouseBidder.makeBidderResponse(httpCall, null);
 
         // then
         assertThat(result.getErrors()).isEmpty();
-        assertThat(result.getValue())
+        assertThat(result.getBids())
                 .containsOnly(BidderBid.of(Bid.builder().impid("123").build(), banner, "USD"));
     }
 
@@ -226,8 +234,120 @@ public class RtbhouseBidderTest extends VertxTest {
         });
     }
 
-    private static BidResponse givenBidResponse(Function<Bid.BidBuilder, Bid.BidBuilder> bidCustomizer) {
-        return BidResponse.builder()
+    @Test
+    public void makeHttpRequestShouldReturnResultWithAuctionEnvironment() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(singletonList(
+                        Imp.builder()
+                                .id("impId2")
+                                .banner(Banner.builder().build())
+                                .tagid("unitId")
+                                .ext(mapper.valueToTree(Map.of("ae", 1, "bidder", Map.of())))
+                                .build())
+                ).build();
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = rtbhouseBidder.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getValue()).hasSize(1)
+                .extracting(HttpRequest::getPayload)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getExt)
+                .contains(mapper.valueToTree(Map.of("ae", 1)));
+    }
+
+    @Test
+    public void makeBidsShouldReturnResultWithExpectedFields() throws JsonProcessingException {
+        // given
+        final BidderCall<BidRequest> httpCall = givenHttpCall(
+                BidRequest.builder()
+                        .imp(singletonList(Imp.builder().id("123").build()))
+                        .build(),
+                mapper.writeValueAsString(RtbhouseBidResponse.builder()
+                .seatbid(singletonList(SeatBid.builder()
+                        .bid(singletonList(Bid.builder()
+                                .w(200)
+                                .h(150)
+                                .price(BigDecimal.ONE)
+                                .impid("impId1")
+                                .dealid("dealid")
+                                .adm("<div>This is an Ad</div>")
+                                .build()))
+                        .build()))
+                .cur("UAH")
+                .ext(RtbhouseBidResponseExt.of(Map.of("impId1",
+                        mapper.createObjectNode().put("somevalue", 1))))
+                .build()));
+
+        final BidRequest bidRequest = BidRequest.builder()
+                .id("bidRequestId")
+                .imp(singletonList(Imp.builder()
+                        .id("impId1")
+                        .banner(Banner.builder().build())
+                        .build()))
+                .build();
+
+        // when
+        final CompositeBidderResponse result = rtbhouseBidder.makeBidderResponse(httpCall, bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getBids()).hasSize(1)
+                .containsOnly(BidderBid.of(
+                        Bid.builder()
+                                .impid("impId1")
+                                .price(BigDecimal.ONE)
+                                .dealid("dealid")
+                                .w(200)
+                                .h(150)
+                                .adm("<div>This is an Ad</div>")
+                                .build(),
+                        BidType.banner, "UAH"));
+        assertThat(result.getFledgeAuctionConfigs())
+                .containsOnly(FledgeAuctionConfig.builder()
+                        .impId("impId1")
+                        .config(mapper.createObjectNode().put("somevalue", 1))
+                        .build());
+    }
+
+    @Test
+    public void makeBidsShouldReturnFledgeConfigEvenIfNoBids() throws JsonProcessingException {
+        // given
+        final BidderCall<BidRequest> httpCall = givenHttpCall(
+                BidRequest.builder()
+                        .imp(singletonList(Imp.builder().id("123").build()))
+                        .build(),
+                mapper.writeValueAsString(RtbhouseBidResponse.builder()
+                .seatbid(emptyList())
+                .ext(RtbhouseBidResponseExt.of(Map.of("impId1",
+                        mapper.createObjectNode().put("somevalue", 1))))
+                .build()));
+
+        final BidRequest bidRequest = BidRequest.builder()
+                .id("bidRequestId")
+                .imp(singletonList(Imp.builder()
+                        .id("impId1")
+                        .banner(Banner.builder().build())
+                        .build()))
+                .build();
+
+        // when
+        final CompositeBidderResponse result = rtbhouseBidder.makeBidderResponse(httpCall, bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getBids()).isEmpty();
+        assertThat(result.getFledgeAuctionConfigs())
+                .containsOnly(FledgeAuctionConfig.builder()
+                        .impId("impId1")
+                        .config(mapper.createObjectNode().put("somevalue", 1))
+                        .build());
+    }
+
+    private static RtbhouseBidResponse givenBidResponse(Function<Bid.BidBuilder, Bid.BidBuilder> bidCustomizer) {
+        return RtbhouseBidResponse.builder()
                 .cur("USD")
                 .seatbid(singletonList(SeatBid.builder()
                         .bid(singletonList(bidCustomizer.apply(Bid.builder()).build()))
